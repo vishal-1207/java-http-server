@@ -5,7 +5,6 @@ import java.util.Map;
 
 import com.httpServer.http.HttpRequest;
 import com.httpServer.http.HttpResponse;
-import com.httpServer.route.RouteHandler;
 
 public class Router {
 	private final Map<String, RouteHandler> routes = new HashMap<>();
