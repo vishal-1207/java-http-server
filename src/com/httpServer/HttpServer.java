@@ -27,7 +27,7 @@ public class HttpServer {
 		router.get("/", (req) -> HttpResponse.ok("Welcome to Java HTTP Server.\r\n"));
 		router.get("/hello", (req) -> {
 			String name = req.getQueryParams().getOrDefault("name", "World");
-			return HttpResponse.ok("Hello " + name + "!");
+			return HttpResponse.ok("Hello " + name + "!\r\n");
 		});
 		router.post("/echo", (req) -> HttpResponse.ok("You sent: " + req.getBody() + "\r\n"));
 	}
