@@ -24,6 +24,6 @@ public class Router {
 			return handler.handle(request);
 		}
 		
-		return HttpResponse.notFound();
+		return request.isJson() ? HttpResponse.jsonError(404, "Not Found") : HttpResponse.notFound();
 	}
 }
