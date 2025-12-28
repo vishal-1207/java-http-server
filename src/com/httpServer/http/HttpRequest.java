@@ -10,6 +10,7 @@ public class HttpRequest {
 	private String version;
 	private final Map<String, String> headers = new HashMap<>();
 	private final Map<String, String> queryParams = new HashMap<>();
+	private final Map<String, Object> attributes = new HashMap<>();
 	String body = "";
 	
 	public String getMethod() {
@@ -36,10 +37,17 @@ public class HttpRequest {
 		return queryParams;
 	}
 	
+	public Map<String, Object> getAttributes() { 
+		return attributes; 
+	}
+	
 	public String getBody() {
 		return body;
 	}
 	
+	public boolean isJson() {
+		return headers.getOrDefault("Content-Type", "").contains("application/json");
+	}
 	
 	public void setMethod(String method) {
 		this.method = method;
