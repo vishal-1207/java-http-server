@@ -8,19 +8,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.httpServer.http.*;
 import com.httpServer.route.*;
+import com.httpServer.middleware.*;
 
 public class HttpServer {
 	private final int port;
 	private final Router router = new Router();
 	private final ExecutorService threadPool = Executors.newFixedThreadPool(10);
 	private final String staticDir = "public";
+	private final List<Middleware> middlewares = new ArrayList<>();
 	
 	public HttpServer(int port) {
 		this.port = port;
+		registerMiddlewares();
 		registerRoutes();	
+	}
+	
+	private void registerMiddlewares() {
+		middlewares.add(new LoggingMiddleware());
+		middlewares.add(new TimingMiddleware());
 	}
 	
 	private void registerRoutes() {
@@ -30,6 +40,7 @@ public class HttpServer {
 			return HttpResponse.ok("Hello " + name + "!\r\n");
 		});
 		router.post("/echo", (req) -> HttpResponse.ok("You sent: " + req.getBody() + "\r\n"));
+		router.post("/json", (req) -> HttpResponse.json(req.getBody() + "\r\n"));
 	}
 	
 	public void start() throws IOException {
@@ -49,35 +60,47 @@ public class HttpServer {
 	}
 	
 	private void handleClient(Socket client) {
+		HttpRequest request = null;
 		String threadName = Thread.currentThread().getName();
 		try (
 			InputStream in = client.getInputStream();
 			OutputStream out = client.getOutputStream();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
 		) {
-			HttpRequest request = HttpParser.parse(reader);
-			System.out.println("[" + threadName + "] " + request.getMethod() + " " + request.getPath());
+			request = HttpParser.parse(reader);
+			
+			for (Middleware m: middlewares) {
+				m.before(request);
+			}
 
 			HttpResponse response;
 			if ("GET".equals(request.getMethod()) && request.getPath().startsWith("/static/")) {
-				response = serveStatic(request.getPath().substring("/static".length()));
+				response = serveStatic(request.getPath().substring("/static".length()), request);
 			} else {
 				response = router.route(request);
 			}
 
+			for (Middleware m: middlewares) {
+				m.after(request);	
+			}
 
 			out.write(response.toBytes());	
 			out.flush();
 
 
 		} catch (IOException e) {
-			e.printStackTrace();
+			try {
+				if (request != null) {
+					HttpResponse err = request.isJson() ? HttpResponse.jsonError(500, "Internal Server Error \r\n") : HttpResponse.serverError("Internal Server Error \r\n");
+					client.getOutputStream().write(err.toBytes());
+				}
+			} catch (IOException ignored) {	}
 		} finally {
 			try { client.close(); } catch (IOException ignored) {}
 		}
 	}
 	
-	private HttpResponse serveStatic(String relativePath) {
+	private HttpResponse serveStatic(String relativePath, HttpRequest req) {
 		try {
 			if (relativePath.isEmpty() || relativePath.equals("/")) {
 				relativePath = "/index.html";
@@ -85,14 +108,14 @@ public class HttpServer {
 			
 			Path filePath = Path.of(staticDir + relativePath).normalize();
 			if (!filePath.startsWith(staticDir) || !Files.exists(filePath) || Files.isDirectory(filePath)) {
-				return HttpResponse.notFound();
+				return req.isJson() ? HttpResponse.jsonError(404, "Not Found \r\n") : HttpResponse.notFound();
 			}
 			
 			byte[] data = Files.readAllBytes(filePath);
 			String contentType = guessContentType(filePath.toString());
 			return HttpResponse.okBytes(data, contentType);
 		} catch (IOException e) {
-			return HttpResponse.serverError("Failed to read file.");
+			return req.isJson() ? HttpResponse.jsonError(500, "Failed to read file  \r\n") : HttpResponse.serverError("Failed to read file  \r\n");
 		}
 	}
 	
