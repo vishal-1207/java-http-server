@@ -16,6 +16,18 @@ public class HttpResponse {
 		return okBytes(body.getBytes(StandardCharsets.UTF_8), "text/plain; charset=utf-8");
 	}
 	
+	public static HttpResponse json(String json) {
+		return okBytes(json.getBytes(StandardCharsets.UTF_8), "application/json; charset=utf-8");
+	}
+	
+	public static HttpResponse jsonError(int status, String message) {
+		String json = String.format("{\"status\":%d,\"error\":\"%s\"}", status, message);
+		HttpResponse res = okBytes(json.getBytes(StandardCharsets.UTF_8), "application/json; charset=utf-8");
+		res.status = status;
+		res.statusText = status == 400 ? "Not Found" : "Internal Server Error";
+		return res;
+	}
+	
 	public static HttpResponse okBytes(byte[] data, String contentType) {
 		HttpResponse res = new HttpResponse();
 		res.status = 200;
@@ -31,7 +43,7 @@ public class HttpResponse {
 		HttpResponse res = new HttpResponse();
 		res.status = 404;
 		res.statusText = "Not Found";
-		String body = "404 Not Found\r\n";
+		String body = "404 Not Found \r\n";
 		res.body = body.getBytes(StandardCharsets.UTF_8);
 		res.headers.put("Content-Type", "text/plain; charset=utf-8");
 		res.headers.put("Content-Length", String.valueOf(res.body.length));
@@ -42,7 +54,7 @@ public class HttpResponse {
 	public static HttpResponse serverError(String msg) {
 		HttpResponse res = new HttpResponse();
 		res.status = 500;
-		res.statusText = "Internal Server Error";
+		res.statusText = "Internal Server Error \r\n";
 		res.body = msg.getBytes(StandardCharsets.UTF_8);
 		res.headers.put("Content-Type", "text/plain; charset=utf-8");
 		res.headers.put("Content-Length", String.valueOf(res.body.length));
